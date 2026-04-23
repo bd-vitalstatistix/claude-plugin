@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "polaris": {
+      "type": "http",
+      "url": "https://polaris.blackduck.com/api/mcp",
+      "headers": {
+        "Api-Token": "${POLARIS_ACCESS_TOKEN}"
+      }
+    },
+    "service-mcp": {
+      "type": "http",
+      "url": "https://mcp.labs.blackduck.com/mcp/"
+    }
+  }
+}
