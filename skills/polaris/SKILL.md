@@ -356,4 +356,42 @@ Note: The old `sig-repo.synopsys.com` domain is deprecated — use `repo.blackdu
 - **Polaris web UI**: https://polaris.blackduck.com → select portfolio "Data Science" → project
 - **GitHub Security tab**: repo → Security → Code scanning alerts (populated from SARIF upload)
 - **PR comments**: Polaris posts a findings summary comment on each PR automatically
-- **Polaris MCP**: if `POLARIS_ACCESS_TOKEN` is available, the Polaris Issue Management MCP server at `https://polaris.blackduck.com/api/mcp` exposes tools for querying issues, portfolio metrics, and entitlements
+- **Polaris MCP**: see below
+
+---
+
+## Polaris MCP server
+
+The Polaris Issue Management MCP server is hosted at `https://polaris.blackduck.com/api/mcp`. It exposes read-only tools for querying issues, portfolio metrics, and entitlements — no installation required.
+
+### `.mcp.json` (repo root)
+
+```json
+{
+  "mcpServers": {
+    "polaris": {
+      "type": "http",
+      "url": "https://polaris.blackduck.com/api/mcp",
+      "headers": {
+        "Api-Token": "${POLARIS_ACCESS_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+- Auth uses the same `POLARIS_ACCESS_TOKEN` as the scan. The header name is `Api-Token` (case-sensitive).
+- Token must be set in the shell environment before launching Claude Code — it is not read from `.env` automatically.
+- For EU/KSA instances, replace the URL with `https://eu.polaris.blackduck.com/api/mcp` or `https://ksa.polaris.blackduck.com/api/mcp`.
+
+The server is self-documenting — Claude Code will list available tools on connection.
+
+### Checklist addition
+
+Add `.mcp.json` to the new-repo checklist and verify the MCP server connects:
+
+```bash
+# Quick connectivity check — should return tool list
+curl -s -H "Api-Token: $POLARIS_ACCESS_TOKEN" \
+  https://polaris.blackduck.com/api/mcp | head -20
+```
