@@ -6,7 +6,7 @@
     "name": "Andrew Bolster",
     "email": "bolster@blackduck.com"
   },
-  "repository": "https://github.com/bd-vitalstatistix/claude-marketplace",
+  "repository": "https://github.com/bd-vitalstatistix/claude-plugin",
   "license": "MIT",
   "keywords": ["blackduck", "data-science", "llm-gateway", "atlassian", "analytics", "confluence", "jira"]
 }
