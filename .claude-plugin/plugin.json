@@ -1,12 +1,20 @@
 {
   "name": "data-science",
   "description": "Work-specific capabilities for the Black Duck Data Science team: LLM Gateway management, Atlassian/Confluence/JIRA workflows, data analytics patterns, and content creation guidelines.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": {
     "name": "Andrew Bolster",
     "email": "bolster@blackduck.com"
   },
   "repository": "https://github.com/bd-vitalstatistix/claude-plugin",
   "license": "MIT",
-  "keywords": ["blackduck", "data-science", "llm-gateway", "atlassian", "analytics", "confluence", "jira"]
+  "keywords": [
+    "blackduck",
+    "data-science",
+    "llm-gateway",
+    "atlassian",
+    "analytics",
+    "confluence",
+    "jira"
+  ]
 }
