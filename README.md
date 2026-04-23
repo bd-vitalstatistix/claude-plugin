@@ -54,6 +54,14 @@ JIRA project management for the DS project (`cloudId: 739838e2-f328-4f14-a533-3f
 /data-science:project-management
 ```
 
+### `polaris`
+
+Add Black Duck Polaris SAST+SCA security scanning to any repo. One-time setup commands (`gh variable set` / `gh secret set`), generic `polaris.yml` template, GitHub Actions workflow with SARIF upload, local `scripts/polaris-scan.sh` with auto Bridge CLI download, `.gitignore` additions, and language-specific notes (standard Python, UV inline scripts workaround, non-Python projects, Makefile false-positive).
+
+```
+/data-science:polaris
+```
+
 ## Validation
 
 ```bash
