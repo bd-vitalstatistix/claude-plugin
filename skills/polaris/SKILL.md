@@ -10,6 +10,9 @@ Add Black Duck Polaris SAST and SCA security scanning to a repository. Covers Gi
 ## Reference implementations
 - `bd-vitalstatistix/service-mcp` — baseline (requirements.txt / pyproject.toml project)
 - `bd-vitalstatistix/service-llm` — with UV inline script (`# /// script`) workaround
+- `bd-vitalstatistix/hub-rest-api-python` — non-`main` default branch (`master`); Python SDK
+- `bd-vitalstatistix/dbt-uc-transforms` — dbt project; excludes dbt build artefacts from capture
+- `bd-vitalstatistix/minimal-hub-mcp` — UV inline scripts only (no requirements.txt); UV export workaround enabled
 
 ---
 
@@ -33,11 +36,52 @@ gh variable list -R <org>/<repo> | grep POLARIS
 gh secret list -R <org>/<repo> | grep POLARIS
 ```
 
-The Polaris project is auto-created on first scan if your token has sufficient permissions. **Run the initial scan on `main`** — whichever branch scans first becomes the Polaris project's default branch and cannot be changed via the UI.
+The Polaris project is auto-created on first scan if your token has sufficient permissions. **Run the initial scan on the default branch** — whichever branch scans first becomes the Polaris project's default branch and cannot be changed via the UI.
 
 The project should go under:
 - **Portfolio / Application**: `Data Science`
 - **Project name**: the repo name (e.g. `service-llm`, `service-mcp`)
+
+---
+
+## Branch and PR workflow — IMPORTANT
+
+**Never commit Polaris files directly to whatever branch is currently checked out.** Repos use different default branch names (`main`, `master`, or something else entirely), and the agent may be invoked while a feature branch is active.
+
+### Step 1 — detect the default branch
+
+```bash
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
+echo "Default branch: $DEFAULT_BRANCH"
+```
+
+### Step 2 — create a fresh branch off the default
+
+```bash
+git fetch origin
+git checkout -b chore/add-polaris-scanning origin/$DEFAULT_BRANCH
+```
+
+### Step 3 — write all Polaris files, commit, push, open PR
+
+```bash
+# ... write polaris.yml, .github/workflows/polaris-scan.yml, .gitignore updates ...
+
+git add polaris.yml .github/workflows/polaris-scan.yml .gitignore
+git commit -m "chore: add Polaris SAST/SCA scanning"
+git push -u origin chore/add-polaris-scanning
+
+gh pr create \
+  --title "chore: add Polaris SAST/SCA security scanning" \
+  --base "$DEFAULT_BRANCH" \
+  --head chore/add-polaris-scanning \
+  --body "Adds polaris.yml and GitHub Actions workflow for SAST+SCA scanning."
+```
+
+**Why this matters:**
+- The workflow's `on.push.branches` and `on.pull_request.branches` must match the actual default branch name
+- Polaris's first scan sets the project's default branch permanently — it must be the real default, not a feature branch
+- PRs let the scan run before the files land on the default branch (the workflow triggers on pull_request too)
 
 ---
 
@@ -117,14 +161,16 @@ timeout:
 
 Create at `.github/workflows/polaris-scan.yml`.
 
+**Important**: Replace `main` in the `on:` trigger block with the repo's actual default branch name (detected in step 1 above). Do not hardcode `main` — the repo may use `master` or another name.
+
 ```yaml
 name: Polaris Security Scan
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main ]   # ← replace with actual default branch ($DEFAULT_BRANCH)
   pull_request:
-    branches: [ main ]
+    branches: [ main ]   # ← replace with actual default branch ($DEFAULT_BRANCH)
   workflow_dispatch: {}
 
 permissions:
@@ -145,7 +191,7 @@ jobs:
       POLARIS_PROJECT_NAME: "<repo-name>"
       POLARIS_APPLICATION_NAME: "Data Science"
       POLARIS_BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
-      POLARIS_PARENT_BRANCH: ${{ github.event.base_ref || 'main' }}
+      POLARIS_PARENT_BRANCH: ${{ github.event.base_ref || 'main' }}  # replace 'main' with actual default branch
       BRIDGE_GITHUB_USER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BRIDGE_GITHUB_REPOSITORY_OWNER_NAME: ${{ github.repository_owner }}
       BRIDGE_GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
@@ -315,11 +361,15 @@ scripts/requirements-*.txt
 ## Checklist for a new repo
 
 - [ ] Run repo setup commands (variable + secret) via `gh`
+- [ ] Detect the default branch: `gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'`
+- [ ] Create a fresh branch: `git fetch origin && git checkout -b chore/add-polaris-scanning origin/$DEFAULT_BRANCH`
 - [ ] Create `polaris.yml` at repo root — update `project.name` and `captureDirs`
-- [ ] Create `.github/workflows/polaris-scan.yml` — update `POLARIS_PROJECT_NAME`
+- [ ] Create `.github/workflows/polaris-scan.yml` — update `POLARIS_PROJECT_NAME` and replace `main` in `on:` triggers with actual default branch
 - [ ] Add `scripts/polaris-scan.sh` if local scanning is wanted
 - [ ] Add `.gitignore` entries
-- [ ] Push to `main` to trigger the first scan — verify project appears in Polaris UI
+- [ ] Commit, push branch, open PR targeting `$DEFAULT_BRANCH` — the scan runs on the PR itself
+- [ ] Verify the Polaris scan check passes on the PR
+- [ ] Merge PR — this triggers the first scan on the default branch, creating the Polaris project
 - [ ] Check GitHub Security tab for SARIF results after scan completes
 
 ---
