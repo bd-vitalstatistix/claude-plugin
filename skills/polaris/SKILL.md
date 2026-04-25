@@ -8,9 +8,9 @@ disable-model-invocation: false
 Add Black Duck Polaris SAST and SCA scanning to a repository via GitHub Actions.
 
 ## Reference implementations
-- `bd-vitalstatistix/service-mcp` — baseline (requirements.txt / pyproject.toml)
+- `bd-vitalstatistix/service-mcp` — baseline (pyproject.toml); no `polaris.yml` needed
 - `bd-vitalstatistix/service-llm` — UV inline script (`# /// script`) workaround
-- `bd-vitalstatistix/dbt-uc-transforms` — dbt project; excludes build artefacts from capture
+- `bd-vitalstatistix/dbt-uc-transforms` — dbt project with `requirements.txt`
 
 ---
 
@@ -29,7 +29,7 @@ gh secret set POLARIS_ACCESS_TOKEN \
 
 The Polaris project is auto-created on first scan. **Run the initial scan on the default branch** — whichever branch scans first becomes the project's default branch permanently.
 
-Portfolio: `Data Science` / Project name: the repo name.
+**Ask the user**: *"What Polaris application/portfolio should this project go under?"* — default is `Data Science` for Data Science team repos, but other teams use different application names. Project name is the repo name.
 
 ---
 
@@ -86,7 +86,7 @@ jobs:
       POLARIS_SERVER_URL: ${{ vars.POLARIS_SERVER_URL }}
       POLARIS_ACCESS_TOKEN: ${{ secrets.POLARIS_ACCESS_TOKEN }}
       POLARIS_PROJECT_NAME: "<repo-name>"
-      POLARIS_APPLICATION_NAME: "Data Science"
+      POLARIS_APPLICATION_NAME: "Data Science"  # confirm with user — other teams use different application names
       POLARIS_BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
       POLARIS_PARENT_BRANCH: ${{ github.event.base_ref || 'main' }}  # replace 'main'
       BRIDGE_GITHUB_USER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -198,7 +198,7 @@ scripts/requirements-*.txt
 - [ ] Ask: *"What env var holds your Polaris API token?"* — do not assume
 - [ ] `gh variable set` and `gh secret set` for the repo
 - [ ] Detect default branch; create `chore/add-polaris-scanning` off it
-- [ ] Create `.github/workflows/polaris-scan.yml` — update `POLARIS_PROJECT_NAME` and `on:` branch names
+- [ ] Create `.github/workflows/polaris-scan.yml` — update `POLARIS_PROJECT_NAME`, `POLARIS_APPLICATION_NAME`, and `on:` branch names
 - [ ] Add the correct `pip install` step for this repo's dependency format (see language notes)
 - [ ] Add `.gitignore` entries
 - [ ] Commit, push, open PR
@@ -254,11 +254,11 @@ Alternatively, add `[tool.setuptools.packages.find]` to `pyproject.toml` if you 
 
 ### Non-Python projects
 
-Remove the Python setup and pip install steps. Adjust capture dirs in `polaris.yml` if using one.
+Remove the Python setup and pip install steps entirely.
 
 ### Makefile false-positive (C language detection)
 
-If Polaris incorrectly detects C/C++ due to a Makefile, add `"Makefile"` to `excludePatterns` in `polaris.yml`.
+If Polaris incorrectly detects C/C++ due to a Makefile, the workaround is to add a `polaris.yml` at the repo root with `"Makefile"` in `capture.fileSystem.excludePatterns`.
 
 ---
 
@@ -273,7 +273,7 @@ seems the test has encountered error and has entered the state "Pending Review"
 
 Bridge CLI exits with code 2. SAST may have completed fine. This state is undocumented.
 
-1. **Retry** — most often transient, especially on first scan of a new branch: `gh workflow run polaris-scan.yml --repo <org>/<repo> --ref <branch>`
+1. **Retry** — most often transient, especially on first scan of a new branch. Re-run via the GitHub Actions UI, or re-push to the PR branch to re-trigger `pull_request`. (`workflow_dispatch` alone fails on the Bridge CLI's PR-number integer check if there is no open PR.)
 2. **Check Bridge CLI version** — v3.8.0 had a known bug; upgrade to v3.8.1+
 3. **Check Polaris UI** scan history for a more detailed error on the failed SCA run
 4. **File a support case** if it persists — include the scan ID from the error
