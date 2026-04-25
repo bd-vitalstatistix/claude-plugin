@@ -26,15 +26,19 @@ gh variable set POLARIS_SERVER_URL \
   --body "https://polaris.blackduck.com" \
   -R <org>/<repo>
 
-# Secret — sourced from your local shell
+# Secret — ask the user: "What environment variable holds your Polaris API token?"
+# Common names: POLARIS_ACCESS_TOKEN, POLARIS_API_KEY, POLARIS_TOKEN, etc.
+# Use whatever variable name the user provides:
 gh secret set POLARIS_ACCESS_TOKEN \
-  --body "$POLARIS_API_KEY_PROD" \
+  --body "$YOUR_TOKEN_VAR" \     # replace $YOUR_TOKEN_VAR with the user's actual env var
   -R <org>/<repo>
 
 # Verify
 gh variable list -R <org>/<repo> | grep POLARIS
 gh secret list -R <org>/<repo> | grep POLARIS
 ```
+
+**Before running the secret command**, ask the user: *"What environment variable in your shell holds your Polaris API token?"* Different team members use different variable names. Do not guess or hardcode one.
 
 The Polaris project is auto-created on first scan if your token has sufficient permissions. **Run the initial scan on the default branch** — whichever branch scans first becomes the Polaris project's default branch and cannot be changed via the UI.
 
@@ -207,7 +211,14 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Python dependencies   # omit if no requirements.txt
+      # REQUIRED for SCA: Detect inspects the live Python environment.
+      # Without this step, SCA finds nothing and the project shows SAST-only.
+      # Adjust command for your dependency format:
+      #   requirements.txt  →  pip install -r requirements.txt
+      #   pyproject.toml    →  pip install .
+      #   Pipfile           →  pip install pipenv && pipenv install
+      # Omit entirely for non-Python projects.
+      - name: Install Python dependencies
         run: pip install -r requirements.txt
 
       # ── UV inline script workaround ────────────────────────────────────────
@@ -227,7 +238,10 @@ jobs:
       # ───────────────────────────────────────────────────────────────────────
 
       - name: Run Polaris Scan
-        continue-on-error: true
+        # continue-on-error: false during setup — makes auth/config failures visible (red step)
+        # Once scan is verified working (both SAST+SCA appear in Polaris dashboard),
+        # revert to: continue-on-error: true
+        continue-on-error: false
         uses: blackduck-inc/black-duck-security-scan@v2
         with:
           polaris_server_url: ${{ env.POLARIS_SERVER_URL }}
@@ -360,24 +374,59 @@ scripts/requirements-*.txt
 
 ## Checklist for a new repo
 
-- [ ] Run repo setup commands (variable + secret) via `gh`
+**Setup:**
+- [ ] Ask the user: *"What environment variable holds your Polaris API token?"* — do not assume
+- [ ] Run repo setup commands (variable + secret) via `gh` using the user's token variable
 - [ ] Detect the default branch: `gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'`
 - [ ] Create a fresh branch: `git fetch origin && git checkout -b chore/add-polaris-scanning origin/$DEFAULT_BRANCH`
 - [ ] Create `polaris.yml` at repo root — update `project.name` and `captureDirs`
 - [ ] Create `.github/workflows/polaris-scan.yml` — update `POLARIS_PROJECT_NAME` and replace `main` in `on:` triggers with actual default branch
+- [ ] For Python repos: confirm the correct `pip install` step is present before the scan step (see language-specific notes)
+- [ ] Leave `continue-on-error: false` for initial testing (default in template)
 - [ ] Add `scripts/polaris-scan.sh` if local scanning is wanted
 - [ ] Add `.gitignore` entries
 - [ ] Commit, push branch, open PR targeting `$DEFAULT_BRANCH` — the scan runs on the PR itself
-- [ ] Verify the Polaris scan check passes on the PR
-- [ ] Merge PR — this triggers the first scan on the default branch, creating the Polaris project
+
+**Verification:**
+- [ ] Verify the Polaris scan check passes on the PR (green, not skipped)
+- [ ] Confirm **both SAST and SCA** appear in the Polaris dashboard for this project (not just SAST)
 - [ ] Check GitHub Security tab for SARIF results after scan completes
+- [ ] Merge PR — this triggers the first scan on the default branch
+
+**Post-verification:**
+- [ ] Once scan is confirmed working: set `continue-on-error: true` in the workflow and push to avoid blocking deployments
 
 ---
 
 ## Language-specific notes
 
+### SCA requires installed packages — CRITICAL
+
+Black Duck Detect (the SCA component) inspects the **live Python environment**, not just dependency files. If `pip install` has not run before the scan step, Detect finds no installed packages and SCA produces zero findings — even if `polaris_assessment_types: "SAST,SCA"` is correctly set. The project will appear as SAST-only in the Polaris dashboard.
+
+**Always install dependencies before the scan step.** Use the appropriate command for the repo's dependency format:
+
+| Dependency format | Install command |
+|---|---|
+| `requirements.txt` | `pip install -r requirements.txt` |
+| `pyproject.toml` (no requirements.txt) | `pip install .` |
+| `Pipfile` | `pip install pipenv && pipenv install` |
+| UV inline scripts (`# /// script`) | uv export workaround (see below) |
+| JS/TS — no Python | omit Python setup steps entirely |
+
+If SCA still returns no results after installing, add `DETECT_ACCURACY_REQUIRED: NONE` to the workflow env block — this allows Detect to proceed even when pip cannot fully resolve all packages.
+
+### `continue-on-error` lifecycle
+
+The scan step has a `continue-on-error` flag that controls whether a scan failure blocks the workflow:
+
+- **During initial setup / testing**: set `continue-on-error: false` — failures (auth errors, misconfig, SCA finding nothing) will make the workflow step visibly red. This is intentional: you need to see failures while verifying the setup.
+- **Once verified working**: revert to `continue-on-error: true` — scan failures won't block deployments. This is the appropriate production default for teams without strict security gates.
+
+The templates in this skill default to `continue-on-error: false`. **Revert to `true` once you've confirmed a clean scan run** with both SAST and SCA results appearing in the Polaris dashboard.
+
 ### Python with requirements.txt / pyproject.toml
-Standard setup — no special handling needed. Keep the `capture.python.requirementsFiles` list in `polaris.yml` pointing at the right files.
+Standard setup — add `pip install -r requirements.txt` or `pip install .` before the scan step. Keep the `capture.python.requirementsFiles` list in `polaris.yml` pointing at the right files.
 
 ### Python with UV inline scripts (`# /// script`)
 Black Duck Detect cannot parse PEP 723 inline dependency blocks. Add the uv export step to the workflow (shown commented-out above) and add `scripts/requirements-*.txt` to both `polaris.yml` → `requirementsFiles` and `.gitignore`.
