@@ -17,12 +17,28 @@ Four sections (H2 headers only):
 
 ### Two-Stage Workflow
 
-**Stage 1 — Research** (`~/WEEKNOTE.md`):
-- Day-by-day activity with full detail
-- Cross-reference calendar, emails, Teams, git, JIRA
-- Comprehensive source of truth — not for publishing
+**Stage 1 — Research** (`~/WEEKNOTE.md` + scratch notes):
 
-**Stage 2 — Editorial** (publish-ready):
+Launch three background agents **in parallel**, each writing raw findings to disk immediately:
+
+- **Agent 1 — Atlassian**: JIRA + Confluence activity → `~/scratch/weeknote-atlassian-YYYY-MM-DD.md`
+- **Agent 2 — Git**: all repos in `~/src/` → `~/scratch/weeknote-git-YYYY-MM-DD.md`
+- **Agent 3 — Work IQ**: meetings, Teams discussions, DS Office Hour specifics, emails → `~/scratch/weeknote-workiq-YYYY-MM-DD.md`
+
+**Critical**: agents must write findings verbatim to their scratch files. Do NOT rely on context alone — context gets compressed and data is lost. The scratch files are the source of truth.
+
+Work IQ agent should run four queries, saving each result as it arrives:
+1. Meetings (with times in BST/GMT+1, organisers, attendees, transcript highlights)
+2. Teams discussions (specific topics, decisions, who said what — grouped by topic)
+3. DS Office Hour specifically (check chat, shared files, transcript)
+4. Emails (sender/recipient, subject, key content, outcomes)
+
+Once agents complete, integrate all three scratch files into `~/WEEKNOTE.md` (day-by-day, comprehensive, not for publishing). Preserve the scratch files — they survive context compression.
+
+**Stage 2 — Day-by-day verification** (with user):
+Walk through each day with the user to confirm, correct, and fill gaps before publishing. Reference scratch files to answer questions — do not rely on memory.
+
+**Stage 3 — Editorial** (publish-ready):
 - Filter signal from noise (omit routine 1:1s, admin tasks)
 - Consolidate related items thematically
 - Apply voice guidelines (see voice-style skill in bolster plugin)
@@ -88,7 +104,6 @@ Genuine setbacks, named specifically. Apply dry humor. At least one specific, au
 Publish to Confluence:
 - **Space**: Personal `~bolster` (ID: `11042819`)
 - **Parent folder**: Weeknotes (ID: `841482874`)
-- **Label**: `ai-generated` (required)
 
 ## Monthly Blog Posts
 
@@ -120,12 +135,15 @@ Note: Published version uses `+` for sub-bullets, not `*`.
 
 ## Work IQ Queries for Research
 
-Standard queries:
-- "What meetings did I attend this week?"
-- "What emails did I send/receive this week about [topic]?"
-- "What were key discussion topics in my Teams chats this week?"
+Run via background agent — save all responses verbatim to `~/scratch/weeknote-workiq-YYYY-MM-DD.md` as they arrive.
 
-Use returned `conversationId` for follow-up questions. WorkIQ groups by topic — integrate thoughtfully into day-by-day sections.
+Standard queries (run all four):
+- "What meetings did I attend during the week of [Mon]–[Fri] YYYY? For each: title, date, time in BST, duration, organiser, attendees, transcript highlights."
+- "What were the key discussion topics in my Teams chats and channels during [week]? Specific details: who said what, decisions made, problems raised. Group by topic."
+- "What was discussed in the Data Science Office Hour on [date]? Check meeting chat, shared files, transcript."
+- "What emails did I send or receive during [week]? Sender/recipient, subject, key content, outcomes. Group by topic."
+
+Use returned `conversationId` for follow-up questions on any query. WorkIQ groups by topic — integrate thoughtfully into day-by-day sections. If a query returns no transcript, try asking for meeting chat or follow-up emails instead.
 
 ## Mermaid Gantt Charts (if needed)
 

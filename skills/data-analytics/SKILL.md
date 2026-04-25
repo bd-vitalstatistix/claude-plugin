@@ -37,8 +37,8 @@ Three catalog layers, each with multiple schemas:
 
 ## Analysis Workflow
 
-1. **Explore**: `mcp__service-mcp__data_products_list_data_products()` — list available tables
-2. **Understand**: `mcp__service-mcp__data_products_describe_data_product(full_table_name)` — schema + known issues
+1. **Explore**: `mcp__superduck__data_products_list_data_products()` — list available tables
+2. **Understand**: `mcp__superduck__data_products_describe_data_product(full_table_name)` — schema + known issues
 3. **Query**: Use Spark SQL with three-part names: `catalog.schema.table`
 4. **Validate**: Cross-check against known data quality limitations
 5. **Document**: Note data quality context in findings
