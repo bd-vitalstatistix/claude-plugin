@@ -434,6 +434,43 @@ Black Duck Detect cannot parse PEP 723 inline dependency blocks. Add the uv expo
 ### Non-Python projects
 Remove the Python setup and pip install steps from the workflow. Adjust `captureDirs` in `polaris.yml` to point at source directories. The `capture.python` block can be omitted entirely.
 
+### Python with pyproject.toml flat-layout (multiple top-level dirs)
+
+If the repo has multiple top-level directories that look like Python packages (e.g. `app/` for code and `charts/` for Helm), `pip install .` will fail with:
+
+```
+error: Multiple top-level packages discovered in a flat-layout: ['app', 'charts'].
+```
+
+This is a setuptools constraint — it refuses to guess which directory is the real package. **This is not documented in Black Duck/Polaris docs** and surfaces only when SCA triggers a pip install.
+
+Two fixes, in order of preference:
+
+**Option A — tomllib workaround** (no changes to `pyproject.toml`): parse and install deps directly, bypassing setuptools discovery:
+
+```yaml
+- name: Install Python dependencies
+  # pip install . fails due to multi-package flat layout.
+  # Parse dependencies directly from pyproject.toml so SCA can inspect them.
+  run: |
+    python -c "
+    import tomllib, subprocess, sys
+    with open('pyproject.toml', 'rb') as f:
+        deps = tomllib.load(f)['project']['dependencies']
+    subprocess.run([sys.executable, '-m', 'pip', 'install'] + deps, check=True)
+    "
+```
+
+**Option B — fix `pyproject.toml`**: add an explicit package declaration so setuptools knows what to install:
+
+```toml
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]   # or whatever the actual Python package directory is
+```
+
+Option A is preferred when you don't own the `pyproject.toml` or want to avoid touching project metadata.
+
 ### Makefile detection false-positive (C language)
 If Polaris incorrectly detects C/C++ due to a Makefile, add `"Makefile"` to `excludePatterns` in `polaris.yml` (see service-mcp for this pattern).
 
@@ -494,3 +531,45 @@ Add `.mcp.json` to the new-repo checklist and verify the MCP server connects:
 curl -s -H "Api-Token: $POLARIS_ACCESS_TOKEN" \
   https://polaris.blackduck.com/api/mcp | head -20
 ```
+
+---
+
+## Troubleshooting
+
+### SCA produces zero findings / project shows SAST-only
+
+The most common cause: dependencies were not installed before the scan step. Black Duck Detect inspects the **live Python environment** — if no packages are installed, it finds nothing and silently skips SCA.
+
+Checklist:
+1. Confirm a `pip install` step exists **before** the Polaris scan step
+2. Confirm the install step uses the correct format for the repo (see language-specific notes)
+3. Add `DETECT_ACCURACY_REQUIRED: NONE` to the workflow env block if Detect is failing to resolve packages
+4. For `pyproject.toml` repos with multiple top-level dirs — see flat-layout workaround above
+
+### SCA scan enters "Pending Review" state
+
+Symptom (Bridge CLI output):
+```
+ERROR: error while waiting for test with assessment type "SCA(scaPackage)" and id "...":
+seems the test has encountered error and has entered the state "Pending Review"
+```
+Bridge CLI exits with code 2 ("Adapter failed"). The workflow step fails even though SAST completed fine.
+
+**This state is not documented in official Black Duck/Polaris docs.** A related undocumented state ("Pending SNPS") has identical symptoms.
+
+Resolution steps:
+1. **Retry the run** — this is most often a transient server-side failure, especially on first-scan of a new branch. Re-trigger via `gh workflow run polaris-scan.yml --repo <org>/<repo> --ref <branch>`
+2. **Check Bridge CLI version** — v3.8.0 had a known bug causing similar failures; upgrade to v3.8.1+
+3. **Check the Polaris UI** — navigate to the project's scan history and inspect the failed SCA scan for a more detailed error message
+4. **File a support case** if the issue persists across retries — include the scan ID from the error message
+
+### Polaris dashboard shows branch data lagging after CI passes
+
+After a successful CI run (both SAST and SCA artifacts uploaded), the Polaris dashboard may still show only main branch data for several minutes. This is normal — server-side analysis runs asynchronously after artifact upload.
+
+To confirm a scan actually ran, check the CI log for these lines rather than waiting for the dashboard:
+```
+polaris.test.sast.tests.sastFull.artifacts.uploadSuccessful
+polaris.test.sca.tests.scaPackage.artifacts.uploadSuccessful
+```
+Both lines present = both scans submitted successfully. Dashboard will catch up.
