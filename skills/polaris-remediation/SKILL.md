@@ -75,12 +75,6 @@ Cross-check: read the actual files at those paths. API spec YAML/JSON files, arc
 
 The correct mechanism for excluding directory trees from Polaris SAST (Coverity + Sigma) in hybrid/local capture mode is `coverity.yml` at the repo root, under `capture.files`. **This is the only exclusion that reliably flows through to all tools including Sigma (Black Duck Rapid Scan Static).**
 
-Key learnings:
-- `project_source_excludes` in the GitHub Actions workflow only applies to SOURCE_UPLOAD zip mode, not hybrid/local capture mode — it has no effect on sigma in typical CI setups.
-- `.sigma-config.yml` auto-detection is bypassed when Bridge passes `--coverity-config /tmp/...` to `cov-run-sigma` — sigma's own config file is not used.
-- `coverity.yml` `capture.files.exclude-glob` is a single `string` (not an array) and `**` glob is not supported by Coverity's glob implementation.
-- `exclude-regex` supports combining multiple paths with `|` and is the reliable approach.
-
 **Working pattern** (add to `coverity.yml`):
 
 ```yaml
@@ -89,9 +83,23 @@ capture:
     exclude-regex: "(docs/archive/|public/specs/|vendor/)"
 ```
 
-The regex is matched against each file path. Any path containing the pattern is excluded from capture — and therefore from both Coverity SAST analysis and Sigma rapid scan.
+The regex is matched against each file path. Any path containing the pattern is excluded from capture — and therefore from both Coverity SAST analysis and Sigma rapid scan. Multiple paths can be combined with `|`.
 
 If `coverity.yml` does not exist, create it at the repo root.
+
+#### Exclusion mechanisms — what works and what doesn't
+
+| Mechanism | Works for SIGMA in local capture mode? | Notes |
+|---|---|---|
+| `coverity.yml` `capture.files.exclude-regex` | **Yes** | Bridge forwards this to the temp config passed to `cov-run-sigma` |
+| `coverity.yml` `capture.files.exclude-glob` | No | Accepts only a scalar string; `**` glob unsupported; not forwarded to SIGMA's temp config |
+| `project_source_excludes` (GHA action param) | No | Only applies to SOURCE_UPLOAD zip mode — no effect in hybrid/local capture mode |
+| `.sigma-config.yml` `analyze.exclude_file_path` | No | Bridge passes `--coverity-config /tmp/...` to `cov-run-sigma`, bypassing sigma's own config auto-detection |
+
+**Product documentation:**
+- [`capture` section reference (Coverity on Polaris)](https://documentation.blackduck.com/enus/bundle/coverity-on-polaris/page/topics/c_conf-capture.html) — `excludeRegex`, `excludeGlob`, filesystem capture options
+- [`coverity scan` command reference](https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/coverity_scan.html) — `--file-exclude-regex`, `--file-exclude-glob` CLI flags
+- [`project_source_excludes` parameter (Bridge CLI / GitHub Action)](https://documentation.blackduck.com/bundle/bridge-docs/page/bridge/documentation/c_github-polaris.html) — documents when this applies (SOURCE_UPLOAD / remote mode only)
 
 After pushing this change, wait for the next CI scan to complete, then re-query the branch issue count to confirm the excluded-directory issues have dropped to zero.
 
@@ -334,11 +342,7 @@ If and when write tools become available in the Polaris MCP, the false-positive 
 
 **Initial state**: 1,141 issues on `main`. 1,082 were sigma false-positives from `public/specs/portfolio.json` (a 280KB Polaris API spec) and `docs/archive/polaris-apis/*.yaml` (archived API specs). The 5 genuine high findings were `SIGMA.container_requesting_net_raw` in docker-compose files; the remaining ~54 were TypeScript SAST findings (`FORWARD_NULL`, `REVERSE_INULL`, `NO_EFFECT`, `DEADCODE`).
 
-**What did not work**:
-- `.sigma-config.yml` `analyze.exclude_file_path` — bypassed because Bridge passes `--coverity-config /tmp/...` to `cov-run-sigma`, which overrides sigma's auto-detection of its own config
-- `project_source_excludes` in the GHA workflow — only applies to SOURCE_UPLOAD zip mode; no effect in hybrid/local capture mode
-- `coverity.yml` `capture.files.exclude-glob: "docs/archive/**"` — `**` glob unsupported; AND it only accepts a single string value, not an array
-- `coverity.yml` `capture.files.exclude-glob: "public/specs/*"` — `*` glob matched but `project_source_excludes` still not effective; needed to use `exclude-regex` instead
+**What did not work**: see the exclusion mechanism table in Phase 0.5 for the full failure analysis. In short: `project_source_excludes`, `.sigma-config.yml`, and `exclude-glob` all failed for different reasons in hybrid/local capture mode.
 
 **What worked** (PR #70, commit 711e1fb):
 ```yaml
