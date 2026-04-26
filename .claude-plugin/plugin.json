@@ -1,7 +1,7 @@
 {
   "name": "data-science",
   "description": "Work-specific capabilities for the Black Duck Data Science team: LLM Gateway management, Atlassian/Confluence/JIRA workflows, data analytics patterns, and content creation guidelines.",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "author": {
     "name": "Andrew Bolster",
     "email": "bolster@blackduck.com"
