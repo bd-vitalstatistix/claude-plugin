@@ -54,6 +54,14 @@ JIRA project management for the DS project (`cloudId: 739838e2-f328-4f14-a533-3f
 /data-science:project-management
 ```
 
+### `databricks-query`
+
+Execute SQL against the BD Databricks workspace and retrieve actual results. SQL Statement Execution API 2.0 pattern (not jobs/notebooks), workspace config (profile `blackduck_general`, warehouse ID), synchronous vs async query modes, `wait_timeout` constraints, result format, auth recovery.
+
+```
+/data-science:databricks-query
+```
+
 ### `polaris`
 
 Add Black Duck Polaris SAST+SCA security scanning to any repo. One-time setup commands (`gh variable set` / `gh secret set`), generic `polaris.yml` template, GitHub Actions workflow with SARIF upload, local `scripts/polaris-scan.sh` with auto Bridge CLI download, `.gitignore` additions, and language-specific notes (standard Python, UV inline scripts workaround, non-Python projects, Makefile false-positive).
