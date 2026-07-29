@@ -30,12 +30,28 @@ Confluence and JIRA operations. Page creation with mandatory `ai-generated` labe
 /data-science:atlassian-workflows
 ```
 
+### `data-engineering-patterns`
+
+End-to-end data engineering reference synthesising three guides from `data_sources/guides/`: pipeline pattern selection (simplified vs full medallion vs hybrid), Airflow DAG → data product lifecycle (5 stages from DAG config through backlog processing, dbt staging, and SuperDuck registration), and Databricks ETL job configuration (cluster types, bundle structure, error prevention). Cross-references `data-product-description-standards` for dbt model documentation.
+
+```
+/data-science:data-engineering-patterns
+```
+
 ### `data-analytics`
 
-Black Duck security data product analytics. Three-catalog architecture (`data_product_marts`, `data_product_intermediate`, `data_product_staging`). Scale context (~4K customers → ~2.8M findings → ~20M scans). Common gotchas (duplicate records, VARIANT columns requiring STRING cast). Analysis workflow, Spark SQL standards, common query patterns including LLM Gateway.
+Black Duck security data product analytics. Three-catalog architecture (`data_product_marts`, `data_product_intermediate`, `data_product_staging`). Scale context (~4K customers → ~2.8M findings → ~20M scans). Common gotchas (duplicate records, VARIANT columns requiring STRING cast). Analysis workflow, Spark SQL standards, merged query patterns from `data_sources/guides/common-patterns.md` covering joins, CTEs, window functions, time series, data quality checks, and filtering.
 
 ```
 /data-science:data-analytics
+```
+
+### `data-product-description-standards`
+
+Standards for writing dbt model and column descriptions in `_<schema>__models.yml` files. Describes what belongs in a description (grain, relationships, caveats) and what does not (pipeline internals, implementation details). Documents how descriptions propagate to SuperDuck via `persist_docs` and `update_catalog_descriptions()`.
+
+```
+/data-science:data-product-description-standards
 ```
 
 ### `content-creation`

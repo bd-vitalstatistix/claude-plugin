@@ -29,61 +29,241 @@ Three catalog layers, each with multiple schemas:
 
 ## Common Gotchas
 
-- Polaris EU/US customers may have duplicate records
-- Customer names in Polaris may be MD5 hashes
+- Polaris EU/US customers may have duplicate records — deduplicate on a stable key
+- Customer names in Polaris may be MD5 hashes rather than readable names
 - Not all foreign key relationships are clean (orphaned records exist)
-- Scan volumes vary dramatically by product/tool type
-- `model_group`, `proxy_base_url`, `team_alias` in `llm_gateway` tables are VARIANT — cast to STRING before grouping
+- Scan volumes vary dramatically by product/tool type — avoid raw cross-tool comparisons
+- `model_group`, `proxy_base_url`, `team_alias` in `llm_gateway` tables are VARIANT — cast to STRING before grouping: `CAST(model_group AS STRING)`
 
 ## Analysis Workflow
 
-1. **Explore**: `mcp__superduck__data_products_list_data_products()` — list available tables
+1. **Explore**: `mcp__superduck__data_products_list_data_products()` — discover available tables
 2. **Understand**: `mcp__superduck__data_products_describe_data_product(full_table_name)` — schema + known issues
-3. **Query**: Use Spark SQL with three-part names: `catalog.schema.table`
+3. **Query**: Use Spark SQL with full three-part names: `catalog.schema.table`
 4. **Validate**: Cross-check against known data quality limitations
 5. **Document**: Note data quality context in findings
 
 ## SQL Standards
 
-- Always use full three-part table names: `data_product_marts.core.customers`
-- Default timeout: 60 seconds; increase for complex queries
-- Default limit: 100 rows; adjust as needed
-- Before using example queries, verify current column names via `describe_data_product()`
+- Full three-part table names always: `data_product_marts.core.customers`
+- Backtick-escape special characters: `` `special-table` ``
+- Explicit column lists — avoid `SELECT *` on large tables
+- `LIMIT` on all exploratory queries
+- Filter on partition columns (dates, product, region) when available — reduces scan cost
+- Default timeout: 60s, increase to 120-300 for complex joins
+- Default limit: 100 rows
+- Add comments on non-obvious filters
 
-## Common Query Patterns
+## Query Patterns
+
+### Core Joins
 
 ```sql
--- Customer overview
-SELECT customer_name, COUNT(DISTINCT application_id) AS app_count
+-- Inner join with soft-delete filtering on both sides
+SELECT c.id, c.name, COUNT(DISTINCT a.id) AS app_count
 FROM data_product_marts.core.customers c
-JOIN data_product_marts.core.applications a ON c.customer_id = a.customer_id
-GROUP BY customer_name LIMIT 20;
+JOIN data_product_marts.core.applications a ON c.id = a.customer_id
+WHERE c.is_deleted = false AND a.is_deleted = false
+GROUP BY c.id, c.name
+ORDER BY app_count DESC LIMIT 20;
 
--- Security posture by severity
-SELECT severity, COUNT(*) AS finding_count
+-- Left join preserving nulls
+SELECT c.id, c.name, COALESCE(COUNT(DISTINCT a.id), 0) AS app_count
+FROM data_product_marts.core.customers c
+LEFT JOIN data_product_marts.core.applications a
+  ON c.id = a.customer_id AND a.is_deleted = false
+WHERE c.is_deleted = false
+GROUP BY c.id, c.name
+ORDER BY app_count DESC LIMIT 20;
+
+-- Multi-level traversal: customer → application → target → finding
+SELECT c.id, c.name,
+       COUNT(DISTINCT a.id) AS app_count,
+       COUNT(DISTINCT t.id) AS target_count,
+       COUNT(DISTINCT f.id) AS finding_count
+FROM data_product_marts.core.customers c
+LEFT JOIN data_product_marts.core.applications a
+  ON c.id = a.customer_id AND a.is_deleted = false
+LEFT JOIN data_product_marts.core.targets t
+  ON a.id = t.application_id AND t.is_deleted = false
+LEFT JOIN data_product_marts.core.findings f
+  ON t.id = f.target_id AND f.is_deleted = false
+WHERE c.is_deleted = false
+GROUP BY c.id, c.name
+ORDER BY finding_count DESC LIMIT 20;
+```
+
+### Aggregation
+
+```sql
+-- Distribution with percentage
+SELECT severity, COUNT(*) AS count,
+       ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 1) AS pct
 FROM data_product_marts.core.findings
 WHERE finding_status = 'open'
-GROUP BY severity ORDER BY finding_count DESC;
+GROUP BY severity ORDER BY count DESC;
 
--- Scan volume trends
-SELECT tool_type, DATE_TRUNC('month', created_at) AS month, COUNT(*) AS scan_count
+-- Grouped with HAVING filter
+SELECT customer_id, COUNT(*) AS finding_count
+FROM data_product_marts.core.findings
+WHERE is_deleted = false AND severity = 'critical'
+GROUP BY customer_id
+HAVING COUNT(*) > 10
+ORDER BY finding_count DESC;
+
+-- Multiple aggregations per group
+SELECT customer_id,
+       COUNT(*) AS total_findings,
+       COUNT(DISTINCT target_id) AS affected_targets,
+       MIN(first_detected_at) AS earliest,
+       MAX(first_detected_at) AS latest
+FROM data_product_marts.core.findings
+WHERE is_deleted = false
+GROUP BY customer_id
+ORDER BY total_findings DESC LIMIT 100;
+```
+
+### Time Series
+
+```sql
+-- Monthly aggregation
+SELECT DATE_TRUNC('month', created_at) AS month,
+       COUNT(*) AS finding_count
+FROM data_product_marts.core.findings
+WHERE is_deleted = false
+  AND created_at >= '2024-01-01' AND created_at < '2025-01-01'
+GROUP BY month ORDER BY month;
+
+-- Cumulative running total
+SELECT DATE_TRUNC('month', created_at) AS month,
+       COUNT(*) AS new_count,
+       SUM(COUNT(*)) OVER (ORDER BY DATE_TRUNC('month', created_at)) AS cumulative
+FROM data_product_marts.core.findings
+WHERE is_deleted = false
+GROUP BY month ORDER BY month;
+
+-- Week-over-week change
+WITH weekly AS (
+    SELECT DATE_TRUNC('week', created_at) AS week, COUNT(*) AS count
+    FROM data_product_marts.core.findings
+    WHERE is_deleted = false
+    GROUP BY week
+)
+SELECT week, count,
+       LAG(count) OVER (ORDER BY week) AS prev_week,
+       count - LAG(count) OVER (ORDER BY week) AS change,
+       ROUND((count - LAG(count) OVER (ORDER BY week)) * 100.0
+             / NULLIF(LAG(count) OVER (ORDER BY week), 0), 2) AS pct_change
+FROM weekly ORDER BY week DESC;
+
+-- Scan volume by tool type (monthly)
+SELECT DATE_TRUNC('month', created_at) AS month,
+       tool_type, COUNT(*) AS scan_count
 FROM data_product_marts.core.scans
 WHERE created_at >= DATE_SUB(CURRENT_DATE(), 365)
-GROUP BY tool_type, month ORDER BY month DESC, scan_count DESC;
+GROUP BY 1, 2 ORDER BY 1, 2;
 
--- LLM Gateway weekly summary (VARIANT cast required)
-SELECT COUNT(*) AS total_requests,
-       COUNT(DISTINCT user_id) AS unique_users,
-       SUM(total_tokens) AS total_tokens,
-       ROUND(SUM(response_cost), 2) AS cost_usd
+-- LLM Gateway weekly (VARIANT cast)
+SELECT CAST(model_group AS STRING) AS model,
+       COUNT(*) AS requests,
+       SUM(total_tokens) AS total_tokens
 FROM data_product_staging.llm_gateway.stg_llm_gateway__llm_gateway_usage
-WHERE created_at >= 'YYYY-MM-DD' AND created_at < 'YYYY-MM-DD';
+WHERE created_at >= DATE_SUB(CURRENT_DATE(), 30)
+GROUP BY CAST(model_group AS STRING)
+ORDER BY requests DESC;
+```
 
--- LLM Gateway by model (VARIANT cast)
-SELECT CAST(model_group AS STRING) AS model, COUNT(*) AS requests
-FROM data_product_staging.llm_gateway.stg_llm_gateway__llm_gateway_usage
-WHERE created_at >= 'YYYY-MM-DD'
-GROUP BY CAST(model_group AS STRING) ORDER BY requests DESC LIMIT 10;
+### Window Functions
+
+```sql
+-- Top-N ranking
+SELECT id, name, score,
+       RANK() OVER (ORDER BY score DESC) AS rank
+FROM data_product_marts.core.targets
+WHERE is_deleted = false
+ORDER BY rank LIMIT 10;
+
+-- Top-N per partition (5 most recent findings per customer)
+SELECT customer_id, id, severity,
+       ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY first_detected_at DESC) AS rank
+FROM data_product_marts.core.findings
+WHERE is_deleted = false
+QUALIFY rank <= 5;
+```
+
+### CTEs for Complex Queries
+
+```sql
+WITH active_findings AS (
+    SELECT * FROM data_product_marts.core.findings
+    WHERE is_deleted = false AND severity IN ('critical', 'high')
+)
+SELECT customer_id, COUNT(*) AS critical_high_count
+FROM active_findings
+GROUP BY customer_id
+ORDER BY critical_high_count DESC LIMIT 100;
+
+-- Multi-CTE for layered analysis
+WITH customer_apps AS (
+    SELECT customer_id, COUNT(*) AS app_count
+    FROM data_product_marts.core.applications
+    WHERE is_deleted = false GROUP BY customer_id
+),
+customer_findings AS (
+    SELECT customer_id, COUNT(*) AS finding_count
+    FROM data_product_marts.core.findings
+    WHERE is_deleted = false GROUP BY customer_id
+)
+SELECT c.id, c.name,
+       COALESCE(ca.app_count, 0) AS applications,
+       COALESCE(cf.finding_count, 0) AS findings
+FROM data_product_marts.core.customers c
+LEFT JOIN customer_apps ca ON c.id = ca.customer_id
+LEFT JOIN customer_findings cf ON c.id = cf.customer_id
+WHERE c.is_deleted = false
+ORDER BY findings DESC LIMIT 100;
+```
+
+### Data Quality Checks
+
+```sql
+-- Find duplicate primary keys
+SELECT id, COUNT(*) AS dupes
+FROM data_product_marts.core.customers
+WHERE is_deleted = false
+GROUP BY id HAVING COUNT(*) > 1;
+
+-- Orphaned records (findings with no matching target)
+SELECT f.*
+FROM data_product_marts.core.findings f
+LEFT JOIN data_product_marts.core.targets t ON f.target_id = t.id
+WHERE f.is_deleted = false AND t.id IS NULL
+LIMIT 100;
+
+-- NULL analysis
+SELECT COUNT(*) AS total,
+       COUNT(severity) AS non_null,
+       COUNT(*) - COUNT(severity) AS null_count,
+       ROUND((COUNT(*) - COUNT(severity)) * 100.0 / COUNT(*), 2) AS null_pct
+FROM data_product_marts.core.findings
+WHERE is_deleted = false;
+```
+
+## Filtering Patterns
+
+```sql
+-- Multiple values
+WHERE severity IN ('critical', 'high')
+
+-- Date range (prefer range over function wrapping)
+WHERE created_at >= '2024-01-01' AND created_at < '2024-02-01'  -- correct
+WHERE DATE(created_at) = '2024-01-01'  -- avoid: prevents partition pruning
+
+-- Pattern matching
+WHERE name ILIKE '%search%'
+
+-- NULL defaults
+SELECT COALESCE(severity, 'unknown') AS severity
 ```
 
 ## Reporting Standards
