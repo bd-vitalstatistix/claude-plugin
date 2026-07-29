@@ -86,6 +86,14 @@ Add Black Duck Polaris SAST+SCA security scanning to any repo. One-time setup co
 /data-science:polaris
 ```
 
+### `pypi-resolve`
+
+Python dependency resolution through the internal Artifactory proxy. Documents the 7-day age gate (new packages not yet mirrored) and how to use `pypi-resolve -a -g -o requirements.lock $(cat requirements.txt)` to generate a lock file with only packages still needing replication.
+
+```
+/data-science:pypi-resolve
+```
+
 ## Validation
 
 ```bash
