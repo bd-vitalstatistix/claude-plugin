@@ -94,7 +94,7 @@ ORDER BY finding_count DESC LIMIT 20;
 ```
 
 ### Aggregation
-
+ 
 ```sql
 -- Distribution with percentage
 SELECT severity, COUNT(*) AS count,
