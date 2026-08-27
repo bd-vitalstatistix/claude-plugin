@@ -1,0 +1,31 @@
+{
+    "defaults": {
+        "schedule": 1440,
+        "storage_account": "dataaggbronze",
+        "storage_container": "landing-zone",
+        "schema_repo": "git@github.com:bd-vitalstatistix/superduck-lake-schema-tracking.git",
+        "dataset_category": "product",
+        "datalake_class": "datum",
+        "start_year": 2024,
+        "start_month": 1,
+        "start_day": 1,
+        "catchup": true,
+        "max_active_runs": 3,
+        "write_option": "overwrite",
+        "merge_on": "id",
+        "column_classification": {},
+        "column_description": {},
+        "folder": "mlgpu"
+    },
+    "dags": [
+        {
+            "dataset_name": "YOUR_DATASET_NAME",
+            "dataset_product": "YOUR_PRODUCT_NAME",
+            "data_source": "YOUR_SOURCE_DATABASE",
+            "conn_id": "YOUR_AIRFLOW_CONNECTION_ID",
+            "notes": "Description of what this dataset contains and why",
+            "dag_name": "your_product_your_dataset",
+            "query": "SELECT column1, column2, date_column FROM schema.table WHERE date_column >= '{dag_start_date}' AND date_column < '{dag_end_date}'"
+        }
+    ]
+}
