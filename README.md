@@ -94,6 +94,22 @@ Python dependency resolution through the internal Artifactory proxy. Documents t
 /data-science:pypi-resolve
 ```
 
+### `superduck-dags`
+
+Create and modify Airflow DAGs for the SuperDuck data lake ingestion pipeline. Covers DAG config file structure, SQL query patterns, merge strategies (SCD/overwrite/append/preserve), column classifications, incremental vs full refresh, composite key formatting, and troubleshooting DAG generation errors. Use when adding new data sources to the data lake or adapting existing DAGs.
+
+```
+/data-science:superduck-dags
+```
+
+### `databricks-cicd`
+
+GitHub Actions CI/CD pipelines for Databricks Asset Bundles with staging-to-production workflows. Covers bundle deployment automation, environment variable configuration (fixing prod using staging resources), approval gates, branch protection, and troubleshooting environment separation issues.
+
+```
+/data-science:databricks-cicd
+```
+
 ## Validation
 
 ```bash
