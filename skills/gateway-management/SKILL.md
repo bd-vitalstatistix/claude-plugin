@@ -81,7 +81,7 @@ For new Black Duck staff on `core`:
 
 ## Alternative Data Source
 
-LLM Gateway usage also available via Service-MCP data products:
+LLM Gateway usage also available via SuperDuck MCP data products:
 ```sql
 SELECT COUNT(*) AS total_requests, COUNT(DISTINCT user_id) AS unique_users,
        SUM(total_tokens) AS total_tokens, ROUND(SUM(response_cost),2) AS cost_usd

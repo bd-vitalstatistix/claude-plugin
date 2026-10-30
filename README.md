@@ -8,7 +8,7 @@ Work-specific capabilities for the Black Duck Data Science team: LLM Gateway man
 
 ### `professional-context`
 
-Team and org context: Andrew Bolster (Sr Manager R&D Engineering), Tim Cave, Conor Norris, reports to Drew Streib. Primary projects (LLM Gateway, SuperDuck, Databricks, Service-MCP, MCP Integrations). MCP tool configuration — Atlassian cloudId/space IDs, Service-MCP, WorkIQ. Tool preferences and key constraints.
+Team and org context: Andrew Bolster (Sr Manager R&D Engineering), Tim Cave, Conor Norris, reports to Drew Streib. Primary projects (LLM Gateway, SuperDuck MCP, Databricks, MCP Integrations). MCP tool configuration — Atlassian cloudId/space IDs, SuperDuck MCP, WorkIQ. Tool preferences and key constraints.
 
 ```
 /data-science:professional-context
@@ -16,7 +16,7 @@ Team and org context: Andrew Bolster (Sr Manager R&D Engineering), Tim Cave, Con
 
 ### `gateway-management`
 
-LLM Gateway CLI operations via `scripts/manage.py`. User listing, targeted lookup, user creation (with automatic `bd-staff` team assignment on `core`), budget bumps, usage summary. Budget request workflow via WorkIQ Teams queries. Alternative data source via Service-MCP SQL. Budget warning thresholds.
+LLM Gateway CLI operations via `scripts/manage.py`. User listing, targeted lookup, user creation (with automatic `bd-staff` team assignment on `core`), budget bumps, usage summary. Budget request workflow via WorkIQ Teams queries. Alternative data source via SuperDuck MCP SQL. Budget warning thresholds.
 
 ```
 /data-science:gateway-management

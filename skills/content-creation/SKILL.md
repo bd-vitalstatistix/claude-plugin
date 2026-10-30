@@ -140,7 +140,7 @@ Primary source (requires network to llm.labs.blackduck.com):
 uv run ~/src/service-llm/scripts/manage.py usage-summary --lookback 7 --markdown
 ```
 
-Alternative via Service-MCP — standard queries (substitute week's Monday date):
+Alternative via SuperDuck MCP — standard queries (substitute week's Monday date):
 
 **Top-line summary:**
 ```sql

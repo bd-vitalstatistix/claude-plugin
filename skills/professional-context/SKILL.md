@@ -31,7 +31,7 @@ When attributing team contributions, use "Tim:" and "Conor:" as prefixes.
 | **Databricks** | Shared Databricks environment; data lake infrastructure, telemetry ingest |
 | **Data/AI Policy** | AI tooling governance, compliance, market communications support |
 | **MCP Integrations** | Model Context Protocol service development |
-| **Service-MCP** | Internal MCP server exposing Black Duck security data products |
+| **SuperDuck MCP** | Internal MCP server exposing Black Duck security data products |
 
 ## MCP Tool Configuration
 
@@ -43,7 +43,7 @@ When attributing team contributions, use "Tim:" and "Conor:" as prefixes.
   - Weeknotes parent folder ID: `841482874`
   - Personal space ID for page creation: `"11042819"`
 
-### Service-MCP
+### SuperDuck MCP
 - Black Duck security data products
 - Spark SQL dialect for queries
 - Start with `data_product_marts.core` tables
