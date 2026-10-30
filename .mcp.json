@@ -7,9 +7,9 @@
         "Api-Token": "${POLARIS_ACCESS_TOKEN}"
       }
     },
-    "service-mcp": {
+    "superduck": {
       "type": "http",
-      "url": "https://mcp.labs.blackduck.com/mcp/"
+      "url": "https://service-mcp-app.nicefield-9cf5f7f2.eastus.azurecontainerapps.io/mcp/"
     }
   }
 }

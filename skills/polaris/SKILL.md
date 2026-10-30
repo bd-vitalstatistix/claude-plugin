@@ -8,7 +8,7 @@ disable-model-invocation: false
 Add Black Duck Polaris SAST and SCA scanning to a repository via GitHub Actions.
 
 ## Reference implementations
-- `bd-vitalstatistix/service-mcp` — baseline (pyproject.toml); no `polaris.yml` needed
+- `bd-vitalstatistix/superduck-mcp` — baseline (pyproject.toml); no `polaris.yml` needed
 - `bd-vitalstatistix/service-llm` — UV inline script (`# /// script`) workaround
 - `bd-vitalstatistix/dbt-uc-transforms` — dbt project with `requirements.txt`
 
